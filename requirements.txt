@@ -3,6 +3,5 @@ pandas
 numpy
 matplotlib
 numpy-financial
-math
+plotly
 Floor
-Ceil

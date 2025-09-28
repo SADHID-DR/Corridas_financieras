@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from math import floor, ceil
 import numpy_financial as npf
 import plotly.graph_objects as go
+import plotly.express as px
 
 # --------------------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA
@@ -770,46 +771,106 @@ else:
         st.markdown("<div style='opacity:0.5'>Intereses Generados (Costo de Oportunidad)</div>", unsafe_allow_html=True)
         st.metric(" ", "—")
 
-# Gráfico pastel
-st.markdown("### 🥧 Distribución porcentual de Egresos")
-col_pie1, col_pie2 = st.columns([1,1])
-with col_pie1:
-    fig_pie, ax_pie = plt.subplots(figsize=(2.2,2.2), dpi=300)
-    egresos_totales = {rubro: float(safe_number(df_valores.loc[rubro].sum())) for rubro in rubros}
-    wedges, texts, autotexts = ax_pie.pie(
-        egresos_totales.values(),
-        autopct='%1.1f%%',
-        startangle=90,
-        colors=plt.cm.Pastel1.colors,
-        pctdistance=0.6,
-        textprops={'fontsize': 7}
-    )
-    for autotext in autotexts:
-        autotext.set_color("black")
-        autotext.set_fontsize(7)
-        autotext.set_fontweight("bold")
-    ax_pie.legend(
-        wedges, egresos_totales.keys(),
-        title="Rubros",
-        loc="center right",
-        bbox_to_anchor=(-0.25, 0.5),
-        fontsize=6,
-        title_fontsize=7
-    )
-    ax_pie.axis("equal")
-    st.pyplot(fig_pie)
+# ===============================
+# Data para el gráfico
+# ===============================
+egresos_totales = {rubro: float(safe_number(df_valores.loc[rubro].sum())) for rubro in rubros}
+df_pie = pd.DataFrame({
+    "Rubro": list(egresos_totales.keys()),
+    "Monto": list(egresos_totales.values())
+})
 
-with col_pie2:
+colors = px.colors.qualitative.Set3  # paleta diferenciada
+
+# ===============================
+# Columna izquierda → Gráfico
+# Columna derecha → Top 3
+# ===============================
+col1, col2 = st.columns([2,1])
+
+with col1:
+    fig_pie = px.pie(
+        df_pie,
+        names="Rubro",
+        values="Monto",
+        hole=0.45,
+        color_discrete_sequence=colors
+    )
+
+    fig_pie.update_traces(
+        textinfo="percent+label",
+        textfont=dict(size=12, family="Arial", color="black"),
+        insidetextorientation="radial"
+    )
+
+    fig_pie.update_layout(
+        title=dict(
+            text="Distribución de Egresos por Rubro",
+            font=dict(size=18, family="Arial Black", color="#004080"),
+            x=0.5, xanchor="center"
+        ),
+        legend=dict(
+            title="Rubros",
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=-0.3,
+            font=dict(size=12, family="Arial", color="black")
+        ),
+        margin=dict(l=120, r=20, t=60, b=20)
+    )
+
+    st.plotly_chart(fig_pie, use_container_width=True)
+
+with col2:
+    # Ordenamos top 3
     egresos_sorted = sorted(egresos_totales.items(), key=lambda x: x[1], reverse=True)[:3]
-    st.markdown("### 🔝 Top 3 Rubros de Egresos")
-    for rubro, monto in egresos_sorted:
-        pct = (monto / max(1e-9, sum(egresos_totales.values()))) * 100
-        st.markdown(
-            f"<div style='font-size:20px; font-weight:bold; color:#004080;'>"
-            f"▪ {rubro}: {simbolo_moneda}{monto:,.0f} <span style='color:#222;'>({pct:.1f}%)</span>"
-            f"</div>",
-            unsafe_allow_html=True
-        )
+    total_egresos = sum(egresos_totales.values())
+
+    # Emojis por rubro
+    emoji_map = {
+        "Construcción": "🏗️",
+        "Terreno": "🌱",
+        "Comisión": "💼",
+        "Adicionales": "📑",
+        "Misceláneos": "🎨"
+    }
+
+    # --- HTML cabecera ---
+    st.markdown("""
+    <div style="text-align:center;">
+      <h3 style="color:#004080; margin-bottom:10px;">⭐ Top 3 Rubros de Egresos</h3>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # --- Mini gráfico de barras horizontales ---
+    df_top3 = pd.DataFrame(egresos_sorted, columns=["Rubro","Monto"])
+    df_top3["Porcentaje"] = df_top3["Monto"] / max(1e-9, total_egresos) * 100
+
+    # Normalizar para que todas las barras tengan el mismo largo visual
+    df_top3["Norm"] = 1.0  # todas iguales, solo para estética
+
+    fig_top3 = go.Figure(go.Bar(
+        x=df_top3["Norm"],  # mismo valor
+        y=[f"{emoji_map.get(r,'⭐')} {r}" for r in df_top3["Rubro"]],
+        orientation="h",
+        text=[f"<b>{simbolo_moneda}{m:,.0f} ({p:.1f}%)</b>" for m,p in zip(df_top3["Monto"], df_top3["Porcentaje"])],
+        textposition="inside",
+        insidetextanchor='start',
+        marker=dict(color=px.colors.qualitative.Set3[:len(df_top3)])
+    ))
+
+    fig_top3.update_layout(
+        xaxis=dict(showticklabels=False, visible=False),
+        yaxis=dict(showticklabels=True, tickfont=dict(weight='bold')),
+        margin=dict(l=10, r=10, t=10, b=10),
+        height=250,
+        plot_bgcolor="white",
+        paper_bgcolor="white"
+    )
+
+    st.plotly_chart(fig_top3, use_container_width=True)
 
 # Gráfico de barras apiladas por período
 st.markdown("### 📊 Distribución visual de Egresos")
@@ -844,10 +905,6 @@ st.subheader("📈 Escenarios de Venta y Plan de Pagos")
 
 mostrar_plan_pagos_detallado = st.checkbox("Mostrar Plan de Pagos Detallado", value=True)
 mostrar_flujo_caja_escenarios = st.checkbox("Mostrar Flujo de Caja por Escenario", value=True)
-<<<<<<< HEAD
-
-=======
->>>>>>> d7f5cb8 (fix: cleaned requirements for Streamlit Cloud)
 ingreso_pesimista = float(safe_number(ingreso_total))
 ingreso_normal = float(safe_number(ingreso_total))
 ingreso_optimista = float(safe_number(ingreso_total))
@@ -926,12 +983,8 @@ st.markdown("<h3 style='font-size: 28px;'>💹 KPIs Financieros</h3>", unsafe_al
 escenario_kpi = st.selectbox(
     "Escenario base para ROI",
     ["Pesimista", "Normal", "Optimista"],
-<<<<<<< HEAD
-    index=1
-=======
     index=1,
     key="kpi_scenario_selector"
->>>>>>> d7f5cb8 (fix: cleaned requirements for Streamlit Cloud)
 )
 
 if escenario_kpi == "Pesimista":
@@ -1131,18 +1184,6 @@ def tabla_con_totales(df_num, simbolo_):
     return agregar_totales(df_num, simbolo_)
 
 if mostrar_flujo_caja_escenarios:
-<<<<<<< HEAD
-    st.subheader("💰 Flujo de Caja por Escenario")
-    st.write("### Escenario Pesimista")
-    st.dataframe(tabla_con_totales(df_f_pes_num, simbolo_moneda), use_container_width=True)
-
-    st.write("### Escenario Normal")
-    st.dataframe(tabla_con_totales(df_f_nor_num, simbolo_moneda), use_container_width=True)
-
-    st.write("### Escenario Optimista")
-    st.dataframe(tabla_con_totales(df_f_opt_num, simbolo_moneda), use_container_width=True)
-
-=======
 
     st.markdown("## 🌊 Flujo de Caja Neto – Comparativo de Escenarios")
 
@@ -1257,7 +1298,6 @@ fig_comp.update_layout(
 
 st.plotly_chart(fig_comp, use_container_width=True)
 
->>>>>>> d7f5cb8 (fix: cleaned requirements for Streamlit Cloud)
 # ===============================================================
 #                          KPI PRINCIPAL
 # ===============================================================

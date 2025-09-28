@@ -2,7 +2,7 @@ streamlit
 pandas
 numpy
 matplotlib
-numpy-financial as npf
+numpy-financial
 math
 Floor
 Ceil

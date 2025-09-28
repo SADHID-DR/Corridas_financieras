@@ -1,1 +1,8 @@
 streamlit
+pandas
+numpy
+matplotlib
+numpy-financial as npf
+math
+Floor
+Ceil
